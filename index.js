@@ -3,6 +3,7 @@ let app = express();
 const multer = require("multer");
 const { insertToDb, fetchFromDb } = require("./mongo.js");
 const path = require("path");
+let {logger} = require('./logconfig')
 
 const upload = multer({ dest: "uploads/" });
 
@@ -15,7 +16,7 @@ app.get("/image/:fileName", async function (req, res) {
 app.post("/image/upload", upload.single("file"), (req, res) => {
   const { file } = req;
   insertToDb(file, "abc", "asdad");
-
+  logger.info('file '+file.originalname +' uploaded successfully!')
   return res.send("File Uploaded");
 });
 
