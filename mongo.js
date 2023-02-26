@@ -1,14 +1,13 @@
 const { MongoClient, GridFSBucket } = require("mongodb");
 const fs = require("fs");
+require('dotenv').config()
 
-const url = "mongodb://localhost:27017";
-
-const client = new MongoClient(url);
+const client = new MongoClient(process.env.DB_URL);
 
 client.connect();
 
 const insertToDb = async (file, fileName, bucketName) => {
-  const db = client.db("TESTDB");
+  const db = client.db(process.env.DB_NAME);
   const bucket = new GridFSBucket(db, { bucketName });
   console.log(file);
 
