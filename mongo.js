@@ -1,28 +1,36 @@
-const { MongoClient, GridFSBucket } = require("mongodb");
-const fs = require("fs");
-require('dotenv').config()
+import { MongoClient, GridFSBucket } from "mongodb";
 
+import { config } from "dotenv";
+import fs from "fs";
+
+import { v4 } from "uuid";
+config();
 const client = new MongoClient(process.env.DB_URL);
 
 client.connect();
-
-const insertToDb = async (file, fileName, bucketName) => {
-  const db = client.db(process.env.DB_NAME);
+const db = client.db(process.env.DB_NAME);
+export const insertToDb = (file, fileName, bucketName) => {
   const bucket = new GridFSBucket(db, { bucketName });
   console.log(file);
-
-  fs.createReadStream(Buffer.from(file.path)).pipe(
-    bucket.openUploadStream(fileName, {
-      chunkSizeBytes: 1048576,
-    })
-  );
+  const id = v4();
+  return new Promise((resolve, reject) => {
+    fs.createReadStream(Buffer.from(file.path)).pipe(
+      bucket
+        .openUploadStreamWithId(id, fileName, {
+          chunkSizeBytes: 1048576,
+        })
+        .on("close", () => {
+          resolve(id);
+        })
+        .on("error", (e) => {
+          reject(new Error(e.message));
+        })
+    );
+  });
 };
 
-const fetchFromDb = async (bucketName, fileName) => {
-  const db = client.db("TESTDB");
+export const fetchFromDb = async (bucketName, id) => {
   const bucket = new GridFSBucket(db, { bucketName });
-  const downloadStream = bucket.openDownloadStreamByName(fileName)
+  const downloadStream = bucket.openDownloadStream(id);
   return downloadStream;
 };
-
-module.exports = { fetchFromDb, insertToDb };
