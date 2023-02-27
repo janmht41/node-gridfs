@@ -4,13 +4,24 @@ import multer from "multer";
 import { insertToDb, fetchFromDb } from "./mongo.js";
 import { logger } from "./logconfig.js";
 import { getDbClient } from "./mongo.js";
-
+import { createHash } from "crypto";
+import fs from "fs";
 const app = express();
 
 config();
 const port = process.env.PORT || 3000;
 
 const upload = multer({ dest: "uploads/" });
+
+const getFileHash = (file, hashName) => {
+  return new Promise((resolve, reject) => {
+    const hash = createHash(hashName);
+    const stream = fs.createReadStream(Buffer.from(file.path));
+    stream.on("error", (err) => reject(err));
+    stream.on("data", (chunk) => hash.update(chunk));
+    stream.on("end", () => resolve(hash.digest("hex")));
+  });
+};
 
 app.get("/image/:id", async function (req, res) {
   const db = getDbClient();
@@ -32,9 +43,24 @@ app.post("/image/upload", upload.single("file"), async (req, res) => {
   // add mimetype of file and hash to metadata for every file being stored
   // before uploading check whether hash exists
   // hash is of multer file buffer
-  if (Buffer.from(file.path))
-    if (!file.mimetype.startsWith("image/"))
-      return res.send(415, "only image file is supported!");
+
+  const hash = await getFileHash(file, "sha1");
+  const db = getDbClient();
+  const files = db.collection("asdad.files");
+
+  const count = await files.countDocuments({
+    metadata: { hash },
+  });
+
+  if (count) {
+    logger.error("file alreadty exists in db");
+    return res.send("File already exists!");
+  }
+
+  file.fileHash = hash;
+
+  if (!file.mimetype.startsWith("image/"))
+    return res.send(415, "only image file is supported!");
 
   const id = await insertToDb(file, file.originalname, "asdad");
   logger.info("file " + file.originalname + " uploaded successfully!");

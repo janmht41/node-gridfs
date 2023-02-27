@@ -22,6 +22,7 @@ export const insertToDb = (file, fileName, bucketName) => {
         .openUploadStreamWithId(id, fileName, {
           chunkSizeBytes: 1048576,
           contentType: file.mimetype,
+          metadata: { hash: file.fileHash },
         })
         .on("close", () => {
           resolve(id);
@@ -39,3 +40,5 @@ export const fetchFromDb = async (bucketName, id) => {
   const downloadStream = bucket.openDownloadStream(id);
   return downloadStream;
 };
+
+export const getFileHash = async () => {};
