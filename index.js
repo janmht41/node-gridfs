@@ -1,11 +1,11 @@
 import { config } from "dotenv";
 import express from "express";
 import multer from "multer";
-import { insertToDb, fetchFromDb } from "./mongo.js";
+import { insertToDb, fetchFromDb, getDbClient } from "./mongo.js";
 import { logger } from "./logconfig.js";
-import { getDbClient } from "./mongo.js";
 import { createHash } from "crypto";
 import fs from "fs";
+import path from "path";
 const app = express();
 
 config();
@@ -40,9 +40,6 @@ app.get("/image/:id", async function (req, res) {
 
 app.post("/image/upload", upload.single("file"), async (req, res) => {
   const { file } = req;
-  // add mimetype of file and hash to metadata for every file being stored
-  // before uploading check whether hash exists
-  // hash is of multer file buffer
 
   const hash = await getFileHash(file, "sha1");
   const db = getDbClient();
@@ -53,8 +50,14 @@ app.post("/image/upload", upload.single("file"), async (req, res) => {
   });
 
   if (count) {
-    logger.error("file alreadty exists in db");
-    return res.send("File already exists!");
+    logger.info("file alreadty exists in db");
+    const fileId = await files.findOne({ metadata: { hash } }).then((doc) => {
+      return doc._id;
+    });
+    return res.send(
+      409,
+      "File already exists " + "http://localhost:" + port + "/image/" + fileId
+    );
   }
 
   file.fileHash = hash;
@@ -63,13 +66,34 @@ app.post("/image/upload", upload.single("file"), async (req, res) => {
     return res.send(415, "only image file is supported!");
 
   const id = await insertToDb(file, file.originalname, "asdad");
-  logger.info("file " + file.originalname + " uploaded successfully!");
+  logger.info(
+    "file " +
+      file.originalname +
+      " uploaded successfully!" +
+      ", file size : " +
+      file.size +
+      " bytes"
+  );
+  clearUploads("uploads");
   return res.send(
     "uploaded file at :" + "http://localhost:" + port + "/image/" + id
   );
-  // empty uploads folder
 });
 
+const clearUploads = (directory) => {
+  fs.readdir(directory, (err, files) => {
+    if (err) throw err;
+
+    for (const file of files) {
+      fs.unlink(path.join(directory, file), (err) => {
+        if (err) throw err;
+      });
+    }
+    logger.info("emptied upload dir");
+  });
+};
+
 app.listen(port, function () {
+  logger.info("Server started");
   console.log("Server started on port: " + port);
 });
