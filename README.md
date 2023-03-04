@@ -1,2 +1,2 @@
 # node-gridfs
- multimedia server using gridfs to handle large files
+ multimedia server using gridfs for streaming files
