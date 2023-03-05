@@ -34,11 +34,10 @@ export const insertToDb = (file, fileName, bucketName) => {
   });
 };
 
-export const fetchFromDb = async (bucketName, id) => {
+export const fetchFromDb = async (bucketName, id, start, end) => {
   const db = getDbClient();
   const bucket = new GridFSBucket(db, { bucketName });
-  const downloadStream = bucket.openDownloadStream(id);
+  if (!start) return bucket.openDownloadStream(id);
+  const downloadStream = bucket.openDownloadStream(id, { start, end });
   return downloadStream;
 };
-
-export const getFileHash = async () => {};
