@@ -23,6 +23,41 @@ const getFileHash = (file, hashName) => {
   });
 };
 
+app.get("/video/:id", async (req, res) => {
+  const db = getDbClient();
+  const files = db.collection("asdad.files");
+  const count = await files.countDocuments({ _id: req.params.id });
+  if (!count) {
+    logger.error("id doesn't exist in database");
+    return res.send(404, "No file found with given id");
+  }
+  const CHUNK_SIZE = 5 * 10 ** 6;
+  let range = req.headers.range;
+  if (!range) {
+    range = `0-${CHUNK_SIZE}`;
+  }
+  const doc = await files.findOne({ _id: req.params.id });
+
+  const videoSize = doc.length;
+
+  const start = Number(range.split("-")[0].replace(/\D/g, ""));
+  console.log("start " + start);
+  const end = Math.min(start + CHUNK_SIZE, videoSize - 1);
+  console.log("end " + end);
+  const contentLength = end - start + 1;
+
+  const headers = {
+    "Content-Range": `bytes ${start}-${end}/${videoSize}`,
+    "Accept-Ranges": "bytes",
+    "Content-length": contentLength,
+    "Content-type": "video/mp4",
+  };
+  const downloadStream = await fetchFromDb("asdad", req.params.id, start, end);
+
+  res.writeHead(206, headers);
+  downloadStream.pipe(res);
+});
+
 app.get("/image/:id", async function (req, res) {
   const db = getDbClient();
   const files = db.collection("asdad.files");
@@ -38,9 +73,9 @@ app.get("/image/:id", async function (req, res) {
   downloadStream.pipe(res);
 });
 
-app.post("/image/upload", upload.single("file"), async (req, res) => {
+app.post("/file/upload", upload.single("file"), async (req, res) => {
   const { file } = req;
-
+  //make video streammable before uploading in db
   const hash = await getFileHash(file, "sha1");
   const db = getDbClient();
   const files = db.collection("asdad.files");
@@ -62,9 +97,6 @@ app.post("/image/upload", upload.single("file"), async (req, res) => {
 
   file.fileHash = hash;
 
-  if (!file.mimetype.startsWith("image/"))
-    return res.send(415, "only image file is supported!");
-
   const id = await insertToDb(file, file.originalname, "asdad");
   logger.info(
     "file " +
@@ -75,9 +107,14 @@ app.post("/image/upload", upload.single("file"), async (req, res) => {
       " bytes"
   );
   clearUploads("uploads");
-  return res.send(
-    "uploaded file at :" + "http://localhost:" + port + "/image/" + id
-  );
+  if (file.mimetype.startsWith("image/"))
+    return res.send(
+      "uploaded file at :" + "http://localhost:" + port + "/image/" + id
+    );
+  if (file.mimetype.startsWith("video"))
+    return res.send(
+      "uploaded file at :" + "http://localhost:" + port + "/video/" + id
+    );
 });
 
 const clearUploads = (directory) => {
