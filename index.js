@@ -1,4 +1,5 @@
 import { config } from "dotenv";
+import { CHUNK_SIZE, BASE_URL } from "./utils/constants.js";
 import express from "express";
 import multer from "multer";
 import { insertToDb, fetchFromDb, getDbClient } from "./mongo.js";
@@ -31,7 +32,7 @@ app.get("/video/:id", async (req, res) => {
     logger.error("id doesn't exist in database");
     return res.send(404, "No file found with given id");
   }
-  const CHUNK_SIZE = 5 * 10 ** 6;
+
   let range = req.headers.range;
   if (!range) {
     range = `0-${CHUNK_SIZE}`;
@@ -41,9 +42,9 @@ app.get("/video/:id", async (req, res) => {
   const videoSize = doc.length;
 
   const start = Number(range.split("-")[0].replace(/\D/g, ""));
-  console.log("start " + start);
+
   const end = Math.min(start + CHUNK_SIZE, videoSize - 1);
-  console.log("end " + end);
+
   const contentLength = end - start + 1;
 
   const headers = {
@@ -74,6 +75,8 @@ app.get("/image/:id", async function (req, res) {
 });
 
 app.post("/file/upload", upload.single("file"), async (req, res) => {
+  const start = Date.now();
+
   const { file } = req;
   //make video streammable before uploading in db
   const hash = await getFileHash(file, "sha1");
@@ -91,7 +94,7 @@ app.post("/file/upload", upload.single("file"), async (req, res) => {
     });
     return res.send(
       409,
-      "File already exists " + "http://localhost:" + port + "/image/" + fileId
+      "File already exists " + BASE_URL + port + "/image/" + fileId
     );
   }
 
@@ -107,14 +110,13 @@ app.post("/file/upload", upload.single("file"), async (req, res) => {
       " bytes"
   );
   clearUploads("uploads");
+  const end = Date.now();
+
+  logger.info(`Took ${end - start} ms to process upload req`);
   if (file.mimetype.startsWith("image/"))
-    return res.send(
-      "uploaded file at :" + "http://localhost:" + port + "/image/" + id
-    );
+    return res.send("uploaded file at :" + BASE_URL + port + "/image/" + id);
   if (file.mimetype.startsWith("video"))
-    return res.send(
-      "uploaded file at :" + "http://localhost:" + port + "/video/" + id
-    );
+    return res.send("uploaded file at :" + BASE_URL + port + "/video/" + id);
 });
 
 const clearUploads = (directory) => {
@@ -122,7 +124,7 @@ const clearUploads = (directory) => {
     if (err) throw err;
 
     for (const file of files) {
-      fs.unlink(path.join(directory, file), (err) => {
+      fs.unlinkSync(path.join(directory, file), (err) => {
         if (err) throw err;
       });
     }
@@ -131,6 +133,5 @@ const clearUploads = (directory) => {
 };
 
 app.listen(port, function () {
-  logger.info("Server started");
   console.log("Server started on port: " + port);
 });
