@@ -1,3 +1,2 @@
 # node-gridfs
-
-exploring gridfs with nodejs
+ multimedia server using gridfs for streaming files

@@ -16,9 +16,6 @@ export const logger = winston.createLogger({
   format: combine(timestamp(), json()),
   transports: [
     new winston.transports.File({
-      filename: "./logs/combined.log",
-    }),
-    new winston.transports.File({
       filename: "./logs/app-error.log",
       level: "error",
       format: combine(errorFilter(), timestamp(), json()),

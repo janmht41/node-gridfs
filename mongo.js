@@ -22,6 +22,7 @@ export const insertToDb = (file, fileName, bucketName) => {
         .openUploadStreamWithId(id, fileName, {
           chunkSizeBytes: 1048576,
           contentType: file.mimetype,
+          metadata: { hash: file.fileHash },
         })
         .on("close", () => {
           resolve(id);
@@ -33,9 +34,10 @@ export const insertToDb = (file, fileName, bucketName) => {
   });
 };
 
-export const fetchFromDb = async (bucketName, id) => {
+export const fetchFromDb = async (bucketName, id, start, end) => {
   const db = getDbClient();
   const bucket = new GridFSBucket(db, { bucketName });
-  const downloadStream = bucket.openDownloadStream(id);
+  if (!start) return bucket.openDownloadStream(id);
+  const downloadStream = bucket.openDownloadStream(id, { start, end });
   return downloadStream;
 };
